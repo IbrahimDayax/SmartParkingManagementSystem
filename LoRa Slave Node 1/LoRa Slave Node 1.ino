@@ -1,13 +1,15 @@
 #include <SPI.h>
-#include <LoRa.h>
+#include <RadioLib.h>
 #include <Adafruit_Sensor.h>
 #include <Adafruit_HMC5883_U.h>
 
-#define ss 10
-#define rst 9
-#define dio0 2
+#define RADIO_NSS_PIN 10        // Pin connected to the NSS (Chip Select) of the LoRa module
+#define RADIO_RST_PIN 9         // Pin connected to the reset of the LoRa module
+#define RADIO_DIO0_PIN 2        // Pin connected to DIO0 of the LoRa module
+#define RADIO_DIO1_PIN 3        // Pin connected to DIO1 of the LoRa module
 
-String outgoing;              // Outgoing message
+Module module(RADIO_NSS_PIN, RADIO_RST_PIN, RADIO_DIO0_PIN, RADIO_DIO1_PIN);
+SX1278 radio(&module);
 
 byte msgCount = 0;            // Count of outgoing messages
 byte MasterNode = 0xFF;
@@ -36,11 +38,7 @@ Adafruit_HMC5883_Unified mag = Adafruit_HMC5883_Unified(12345);
 
 void setup() {
   Serial.begin(9600);                   // Initialize serial
-  pinMode(dio0, INPUT);
-  pinMode(rst, OUTPUT);
-  pinMode(ss, OUTPUT);
 
-  /* Initialize the sensor */
   if (!mag.begin()) {
     /* There was a problem detecting the HMC5883 ... check your connections */
     Serial.println("Ooops, no HMC5883 detected ... Check your wiring!");
@@ -51,18 +49,34 @@ void setup() {
 
   Serial.println("LoRa Node1");
 
-  LoRa.setPins(ss, rst, dio0);
+  // Set LoRa module parameters
+  radio.setFrequency(434.0);
+  radio.setBandwidth(125000);
+  radio.setSpreadingFactor(12);
+  radio.setCodingRate(5);
+  radio.setPreambleLength(8);
+  radio.setSyncWord(0x12);
 
-  if (!LoRa.begin(433E6)) {
-    Serial.println("Starting LoRa failed!");
+  // Check if LoRa module initialization is successful
+  if (radio.begin() != 0 && radio.begin() != false) {
+    Serial.println("LoRa init failed");
+    Serial.println(radio.begin());
     while (1);
   }
+
+  Serial.println("Radio initialized successfully");
 }
 
 void loop() {
-
   messageReceived = false;
   currentStatus = false;
+
+  //Test to see if slave node can send data
+  myMessage = "0";
+  sendMessage(myMessage, MasterNode, Node1);
+  Serial.print("Sent message: ");
+  Serial.print(myMessage);
+  Serial.println(" to master node");
 
   /* Get a new sensor event */
   sensors_event_t event;
@@ -73,11 +87,10 @@ void loop() {
   Y = event.magnetic.y;
   Z = event.magnetic.z;
 
-
-  //Delay to prevent sending messages too frequently and to limit effect of noisy values
+  // Delay to prevent sending messages too frequently and to limit the effect of noisy values
   delay(50);
 
-  //Calculate magnitude
+  // Calculate magnitude
   magnitude = sqrt(X * X + Y * Y + Z * Z);
 
   // Calculate heading
@@ -91,7 +104,7 @@ void loop() {
   if (heading < 0)
     heading += 2 * PI;
 
-  // Check for wrap due to addition of declination
+  // Check for wrap due to the addition of declination
   if (heading > 2 * PI)
     heading -= 2 * PI;
 
@@ -100,19 +113,13 @@ void loop() {
 
   if (magCount == 15) {
     if (isCarPresent(magnitudes, magCount, refMagnitude)) {
-      //Serial.println("Car Present at Node 2");
-      //Serial.println("1");
       currentStatus = true;
-      //occupiedStartTimeNode1 = millis();
     } else {
-      //Serial.println("Car Not Present at Node 2");
-      //Serial.println("0");
       currentStatus = false;
     }
-    //delay(500);
-    // Parse for a packet, and call onReceive with the result:
-    onReceive(LoRa.parsePacket());
-    // Resetting the array elements to 0
+
+    onReceive(radio.available());
+
     for (int i = 0; i < 15; i++) {
       magnitudes[i] = 0;
     }
@@ -131,67 +138,75 @@ void loop() {
 }
 
 void onReceive(int packetSize) {
-  if (packetSize == 0) return;          // If there's no packet, return
+  if (packetSize > 0) {
+        int recipient = radio.read();
+    byte sender = radio.read();
+    byte incomingMsgId = radio.read();
+    byte incomingLength = radio.read();
 
-  // Read packet header bytes:
-  int recipient = LoRa.read();          // Recipient address
-  byte sender = LoRa.read();            // Sender address
-  byte incomingMsgId = LoRa.read();     // Incoming message ID
-  byte incomingLength = LoRa.read();    // Incoming message length
+    Serial.print("Received packet. Recipient: ");
+    Serial.print(recipient, HEX);
+    Serial.print(", Sender: ");
+    Serial.print(sender, HEX);
+    Serial.print(", Msg ID: ");
+    Serial.print(incomingMsgId);
+    Serial.print(", Length: ");
+    Serial.println(incomingLength);
 
-  String incoming = "";
+    String incoming = "";
 
-  while (LoRa.available()) {
-    incoming += (char)LoRa.read();
-  }
+    while (radio.available()) {
+      incoming += (char)radio.read();
+    }
 
-  if (incomingLength != incoming.length()) {   // Check length for error
-    // Serial.println("error: message length does not match length");
-    ;
-    return;                             // Skip rest of the function
-  }
+    Serial.print("Received data: ");
+    Serial.println(incoming);
 
-  // If the recipient isn't this device or broadcast,
-  if (recipient != Node1 && recipient != MasterNode) {
-    //Serial.println("This message is not for me.");
-    ;
-    return;                             // Skip rest of the function
-  }
+    if (incomingLength != incoming.length()) {
+      Serial.println("Error: Message length mismatch!");
+      return;
+    }
 
-  Serial.println(incoming);
-  int Val = getValue(incoming, ",", 0).toInt();
-  oldStatus = (getValue(incoming, ",", 1) == "true" || getValue(incoming, ",", 1) == "1");
-  if (Val == 100 && messageReceived == false) {
-    //myMessage = myMessage + X + "," + Y + "," + Z + "," + headingDegrees;
-    myMessage = myMessage + currentStatus + ",";
-    sendMessage(myMessage, MasterNode, Node1);
-    Serial.print("Transmitted status: ");
-    Serial.println(currentStatus);
-    myMessage = "";
-    Val = 0;
-  }
+    if (recipient != Node1 && recipient != MasterNode) {
+      Serial.println("Error: Incorrect recipient address!");
+      return;
+    }
 
-  if (Val == 10) {
-    messageReceived = true;
+    Serial.println(incoming);
+    int Val = getValue(incoming, ",", 0).toInt();
+    oldStatus = (getValue(incoming, ",", 1) == "true" || getValue(incoming, ",", 1) == "1");
+
+    if (Val == 100 && messageReceived == false) {
+      myMessage = myMessage + currentStatus + " This is just extra stuff,";
+      sendMessage(myMessage, MasterNode, Node1);
+      Serial.print("Transmitted status: ");
+      Serial.println(currentStatus);
+      myMessage = "";
+      Val = 0;
+    }
+
+    if (Val == 10) {
+      messageReceived = true;
+    }
   }
 }
 
 void sendMessage(String outgoing, byte MasterNode, byte Node1) {
-  LoRa.beginPacket();                   // Start packet
-  LoRa.write(MasterNode);              // Add destination address
-  LoRa.write(Node1);             // Add sender address
-  LoRa.write(msgCount);                 // Add message ID
-  LoRa.write(outgoing.length());        // Add payload length
-  LoRa.print(outgoing);                 // Add payload
-  LoRa.endPacket();                     // Finish packet and send it
-  msgCount++;                           // Increment message ID
+  // Convert the String to a char array
+  char msg[outgoing.length() + 1];
+  outgoing.toCharArray(msg, outgoing.length() + 1);
+
+  // Transmit the message
+  radio.transmit(Node1, msg, outgoing.length() + 1);
+  msgCount++;  // Increment message ID
 }
 
-String getValue(String data, char separator, int index)
-{
+
+String getValue(String data, char separator, int index) {
   int found = 0;
   int strIndex[] = { 0, -1 };
   int maxIndex = data.length() - 1;
+
   for (int i = 0; i <= maxIndex && found <= index; i++) {
     if (data.charAt(i) == separator || i == maxIndex) {
       found++;
@@ -199,64 +214,65 @@ String getValue(String data, char separator, int index)
       strIndex[1] = (i == maxIndex) ? i + 1 : i;
     }
   }
+
   return found > index ? data.substring(strIndex[0], strIndex[1]) : "";
 }
 
 bool isCarPresent(float magnitudes[], int length, float referenceValue) {
-    int count = 0;
+  int count = 0;
 
-    for (int i = 0; i < length; i++) {
-        if (magnitudes[i] >= referenceValue + 7 || magnitudes[i] <= referenceValue - 7) {
-            count++;
-        } else {
-            count = 0;
-        }
-
-        if (count >= 3) {
-            return true;
-        }
+  for (int i = 0; i < length; i++) {
+    if (magnitudes[i] >= referenceValue + 7 || magnitudes[i] <= referenceValue - 7) {
+      count++;
+    } else {
+      count = 0;
     }
 
-    return false;
+    if (count >= 3) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 float getRefMag(float magnitudes[], int length) {
-    float sum = 0.0;
-    int count = 0;
-    float mean = 0.0;
-    float processedMagnitudes[length];
-    int processedCount = 0;
+  float sum = 0.0;
+  int count = 0;
+  float mean = 0.0;
+  float processedMagnitudes[length];
+  int processedCount = 0;
 
-    // Calculate the mean of non-zero values
-    for (int i = 0; i < length; i++) {
-        if (magnitudes[i] != 0) {
-            sum += magnitudes[i];
-            count++;
-        }
+  // Calculate the mean of non-zero values
+  for (int i = 0; i < length; i++) {
+    if (magnitudes[i] != 0) {
+      sum += magnitudes[i];
+      count++;
     }
+  }
 
-    if (count == 0) {
-        return 0.0;  // If no non-zero values, return 0
+  if (count == 0) {
+    return 0.0;  // If no non-zero values, return 0
+  }
+
+  mean = sum / count;
+
+  // Remove values that deviate too much from the mean
+  for (int i = 0; i < length; i++) {
+    if (magnitudes[i] != 0 && abs(magnitudes[i] - mean) < 10) {
+      processedMagnitudes[processedCount] = magnitudes[i];
+      processedCount++;
     }
+  }
 
-    mean = sum / count;
+  if (processedCount == 0) {
+    return mean;  // Return mean if no values are within range
+  }
 
-    // Remove values that deviate too much from the mean
-    for (int i = 0; i < length; i++) {
-        if (magnitudes[i] != 0 && abs(magnitudes[i] - mean) < 10) {
-            processedMagnitudes[processedCount] = magnitudes[i];
-            processedCount++;
-        }
-    }
+  sum = 0;
+  for (int i = 0; i < processedCount; i++) {
+    sum += processedMagnitudes[i];
+  }
 
-    if (processedCount == 0) {
-        return mean;  // Return mean if no values are within range
-    }
-
-    sum = 0;
-    for (int i = 0; i < processedCount; i++) {
-        sum += processedMagnitudes[i];
-    }
-
-    return sum / processedCount;  // Calculate the new average reference magnitude
+  return sum / processedCount;  // Calculate the new average reference magnitude
 }
