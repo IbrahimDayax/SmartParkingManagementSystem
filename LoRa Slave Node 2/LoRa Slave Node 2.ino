@@ -161,7 +161,7 @@ void onReceive(int packetSize) {
   Serial.println(incoming);
   int Val = getValue(incoming, ",", 0).toInt();
   oldStatus = (getValue(incoming, ",", 1) == "true" || getValue(incoming, ",", 1) == "1");
-  if (Val == 200 && messageReceived == false && (currentStatus != oldStatus)) {
+  if (Val == 20) {
     //myMessage = myMessage + X + "," + Y + "," + Z + "," + headingDegrees;
     myMessage = myMessage + currentStatus + ",";
     sendMessage(myMessage, MasterNode, Node2);
@@ -170,9 +170,9 @@ void onReceive(int packetSize) {
     Serial.println(currentStatus);
   }
 
-  if (Val == 20) {
-    messageReceived = true;
-  }
+  // if (Val == 20) {
+  //   messageReceived = true;
+  // }
 }
 
 void sendMessage(String outgoing, byte MasterNode, byte Node2) {
