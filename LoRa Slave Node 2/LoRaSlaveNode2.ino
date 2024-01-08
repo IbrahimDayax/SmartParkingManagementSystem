@@ -11,7 +11,7 @@ String outgoing;              // Outgoing message
 
 byte msgCount = 0;            // Count of outgoing messages
 byte MasterNode = 0xFF;
-byte Node1 = 0xBB;
+byte Node2 = 0xCC;
 
 float X;
 float Y;
@@ -27,6 +27,7 @@ bool currentStatus = false;
 bool oldStatus;
 bool messageReceived = false;
 unsigned long elapsedTime = 0;
+unsigned long occupiedStartTime = 0;
 
 String myMessage = "";
 String incoming = "";
@@ -49,7 +50,7 @@ void setup() {
 
   while (!Serial);
 
-  Serial.println("LoRa Node1");
+  Serial.println("LoRa Node2");
 
   LoRa.setPins(ss, rst, dio0);
 
@@ -75,7 +76,7 @@ void loop() {
 
 
   //Delay to prevent sending messages too frequently and to limit effect of noisy values
-  delay(50);
+  //delay(50);
 
   //Calculate magnitude
   magnitude = sqrt(X * X + Y * Y + Z * Z);
@@ -103,13 +104,17 @@ void loop() {
       //Serial.println("Car Present at Node 2");
       //Serial.println("1");
       currentStatus = true;
-      //occupiedStartTimeNode1 = millis();
+
+      if (!oldStatus) {
+        occupiedStartTime = millis();
+      }
+
     } else {
       //Serial.println("Car Not Present at Node 2");
       //Serial.println("0");
       currentStatus = false;
     }
-    //delay(500);
+    // delay(500);
     // Parse for a packet, and call onReceive with the result:
     onReceive(LoRa.parsePacket());
     // Resetting the array elements to 0
@@ -134,7 +139,9 @@ void onReceive(int packetSize) {
   if (packetSize == 0) return;          // If there's no packet, return
 
   // Read packet header bytes:
-  int recipient = LoRa.read();          // Recipient address
+  int recipient1 = LoRa.read();          // Recipient1 address
+  int recipient2 = LoRa.read();          // Recipient2 address
+  int recipient3 = LoRa.read();          // Recipient3 address
   byte sender = LoRa.read();            // Sender address
   byte incomingMsgId = LoRa.read();     // Incoming message ID
   byte incomingLength = LoRa.read();    // Incoming message length
@@ -152,54 +159,75 @@ void onReceive(int packetSize) {
   }
 
   // If the recipient isn't this device or broadcast,
-  if (recipient != Node1 && recipient != MasterNode) {
-    //Serial.println("This message is not for me.");
+  if (recipient1 != Node2 && recipient2 != Node2 && recipient3 != Node2 && recipient1 != MasterNode && recipient2 != MasterNode && recipient3 != MasterNode) {
+    Serial.println("This message is not for me.");
     ;
     return;                             // Skip rest of the function
   }
 
+  Serial.print("Incoming message from Master: ");
   Serial.println(incoming);
-  int Val = getValue(incoming, ",", 0).toInt();
-  oldStatus = (getValue(incoming, ",", 1) == "true" || getValue(incoming, ",", 1) == "1");
-  if (Val == 100 && messageReceived == false) {
-    //myMessage = myMessage + X + "," + Y + "," + Z + "," + headingDegrees;
-    myMessage = myMessage + currentStatus + ",";
-    sendMessage(myMessage, MasterNode, Node1);
+
+  // Tokenize the incoming message using strtok
+  char *token = strtok(const_cast<char*>(incoming.c_str()), ",");
+  int tokenIndex = 0;
+  String tokens[4];  // Array to store the four values
+
+  while (token != NULL && tokenIndex < 4) {
+    tokens[tokenIndex] = String(token);
+    token = strtok(NULL, ",");
+    tokenIndex++;
+  }
+
+  // Trim leading and trailing spaces for each token
+  for (int i = 0; i < tokenIndex; ++i) {
+    tokens[i].trim();
+  }
+
+  int Val = tokens[0].toInt();
+  oldStatus = (tokens[2].toInt() == 1);
+  //just for testing purposes
+  Serial.print("Current Status: ");
+  Serial.println(currentStatus);
+  // Serial.print("Received Status: ");
+  // Serial.println(receivedStatus);
+  // oldStatus = (receivedStatus == 1);
+  Serial.print("Old Status: ");
+  Serial.println(oldStatus);
+
+  if (Val == 20 && currentStatus != oldStatus) {
+
+    if (currentStatus) {
+      elapsedTime = millis() - occupiedStartTime;
+      myMessage = myMessage + currentStatus + "," + millisToMinutesAndSeconds(elapsedTime);
+      Serial.print("Elapsed Time: ");
+      Serial.println(millisToMinutesAndSeconds(elapsedTime));
+    } else {
+      myMessage = myMessage + currentStatus + ",";
+    }
+
+    sendMessage(myMessage, MasterNode, Node2);
+    myMessage = "";
+
     Serial.print("Transmitted status: ");
     Serial.println(currentStatus);
-    myMessage = "";
-    Val = 0;
+    //delay(1000);
   }
 
-  if (Val == 10) {
-    messageReceived = true;
-  }
+  // if (Val == 20) {
+  //   messageReceived = true;
+  // }
 }
 
-void sendMessage(String outgoing, byte MasterNode, byte Node1) {
+void sendMessage(String outgoing, byte MasterNode, byte Node2) {
   LoRa.beginPacket();                   // Start packet
   LoRa.write(MasterNode);              // Add destination address
-  LoRa.write(Node1);             // Add sender address
+  LoRa.write(Node2);             // Add sender address
   LoRa.write(msgCount);                 // Add message ID
   LoRa.write(outgoing.length());        // Add payload length
   LoRa.print(outgoing);                 // Add payload
   LoRa.endPacket();                     // Finish packet and send it
   msgCount++;                           // Increment message ID
-}
-
-String getValue(String data, char separator, int index)
-{
-  int found = 0;
-  int strIndex[] = { 0, -1 };
-  int maxIndex = data.length() - 1;
-  for (int i = 0; i <= maxIndex && found <= index; i++) {
-    if (data.charAt(i) == separator || i == maxIndex) {
-      found++;
-      strIndex[0] = strIndex[1] + 1;
-      strIndex[1] = (i == maxIndex) ? i + 1 : i;
-    }
-  }
-  return found > index ? data.substring(strIndex[0], strIndex[1]) : "";
 }
 
 bool isCarPresent(float magnitudes[], int length, float referenceValue) {
@@ -259,4 +287,10 @@ float getRefMag(float magnitudes[], int length) {
     }
 
     return sum / processedCount;  // Calculate the new average reference magnitude
+}
+
+String millisToMinutesAndSeconds(long millis) {
+  long minutes = millis / 60000;
+  long seconds = (millis % 60000) / 1000;
+  return String(minutes) + "m " + String(seconds) + "s";
 }

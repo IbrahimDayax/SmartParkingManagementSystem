@@ -21,35 +21,51 @@ byte msgCount = 0;            // count of outgoing messages
 String incoming = "";
 // Tracks the time since last event fired
 unsigned long previousMillis = 0;
-unsigned long int previoussecs = 0;
-unsigned long int currentsecs = 0;
+unsigned long int previousSecs = 0;
+unsigned long int currentSecs = 0;
 unsigned long currentMillis = 0;
 int interval = 1 ; // updated every 1 second
-int Secs = 0;
+int seconds = 0;
 int x;
 int y;
 int z;
-int headingdegrees;
+int headingDegrees;
+String message;
 
-struct Status {
-  bool statusNode1;
-  bool statusNode2;
-  bool statusNode3;
-};
+float magnitude;
 
-Status current;
+float magsNode1[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+float magsNode2[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+float magsNode3[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+float refMagNode1 = 0;
+float refMagNode2 = 0;
+float refMagNode3 = 0;
+
+float refMagsNode1[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+float refMagsNode2[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+float refMagsNode3[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+int magCount1 = 0;
+int magCount2 = 0;
+int magCount3 = 0;
+
+bool statusNode1 = false;
+bool statusNode2 = false;
+bool statusNode3 = false;
+
+unsigned long refMagTime;
 
 Preferences preferences;
 
-// const char *ssid = "BlazingSpeed-TIME_AB4F";
-// const char *password = "ng96samM";
 const char *ssid = "GalaxyA13";
 const char *password = "ekkc0904";
+// const char *ssid = "BlazingSpeed-TIME_AB4F";
+// const char *password = "ng96samM";
 
 AsyncWebServer server(80);
 
 unsigned long occupiedStartTimeNode2 = 0;  // Store the time when Node2 becomes occupied
-
 
 // HTML, CSS, and JS code stored in program memory
 const char index_html[] PROGMEM = R"rawliteral(
@@ -126,7 +142,7 @@ const char index_html[] PROGMEM = R"rawliteral(
 
     window.onload = function () {
       fetchAndUpdate();
-      setInterval(fetchAndUpdate, 5000);  // Update every 5 seconds (adjust as needed)
+      setInterval(fetchAndUpdate, 1000);  // Update every 1 seconds (adjust as needed)
     };
   </script>
 </body>
@@ -150,9 +166,7 @@ void setup() {
   // Open the preferences for the application, 'my-app'
   preferences.begin("my-app", false);  
   //get the latest status of the parking slots from the flash memory
-  current.statusNode1 = preferences.getBool("statusNode1", false);
-  current.statusNode2 = preferences.getBool("statusNode2", false);
-  current.statusNode3 = preferences.getBool("statusNode3", false);
+  statusNode2 = preferences.getBool("statusNode2", false);
   //refMagNode2 = preferences.getFloat("refMagNode2", 0);
 
   WiFi.begin(ssid, password);
@@ -163,34 +177,70 @@ void setup() {
   Serial.print("Connected to WiFi with IP: ");
   Serial.println(WiFi.localIP());
 
+  // Route for root
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
     String htmlString(index_html);
-    htmlString.replace("%STATUS_NODE_1%", String(current.statusNode1));
-    htmlString.replace("%STATUS_NODE_2%", String(current.statusNode2));
-    htmlString.replace("%STATUS_NODE_3%", String(current.statusNode3));
+    htmlString.replace("%STATUS_NODE_1%", String(statusNode1));
+    htmlString.replace("%STATUS_NODE_2%", String(statusNode2));
+    htmlString.replace("%STATUS_NODE_3%", String(statusNode3));
     request->send_P(200, "text/html", htmlString.c_str());
   });
 
+  // Route for status 
   server.on("/status", HTTP_GET, [](AsyncWebServerRequest *request) {
-    String json = "{\"statusNode1\":" + String(current.statusNode1) +
-                  ",\"statusNode2\":" + String(current.statusNode2) +
-                  ",\"statusNode3\":" + String(current.statusNode3) + "}";
+    String json = "{\"statusNode1\":" + String(statusNode1) +
+                  ",\"statusNode2\":" + String(statusNode2) +
+                  ",\"statusNode3\":" + String(statusNode3) + "}";
     request->send(200, "application/json", json);
   });
 
   server.onNotFound(notFound);
   server.begin();
+
+  refMagTime = millis();
 }
+
 void loop() {
-  sendMessage("100," + String(current.statusNode1), MasterNode, Node1);
-  sendMessage("200," + String(current.statusNode2), MasterNode, Node2);
-  sendMessage("300," + String(current.statusNode3), MasterNode, Node3);
+  currentMillis = millis();
+  currentSecs = currentMillis / 1000;
+  if ((unsigned long)(currentSecs - previousSecs) >= interval) {
+    seconds = seconds + 1;
+    if ( seconds > 5 )
+    { 
+      seconds = 0;
+    }
+    if ( (seconds >= 0) && (seconds <= 1) )
+    {
+      message = "20, " + String(statusNode1) + " ," + String(statusNode2) + " ," + String(statusNode3);
+      sendMessage(message, MasterNode, Node1, Node2, Node3);
+    }
+    if ( (seconds >= 2 ) && (seconds <= 3))
+    {
+      message = "20, " + String(statusNode1) + " ," + String(statusNode2) + " ," + String(statusNode3);
+      sendMessage(message, MasterNode, Node1, Node2, Node3);
+    }
+    if ( (seconds >= 4 ) && (seconds <= 5))
+    {
+      message = "20, " + String(statusNode1) + " ," + String(statusNode2) + " ," + String(statusNode3);
+      sendMessage(message, MasterNode, Node1, Node2, Node3);
+    }
+    previousSecs = currentSecs;
+  }
+
+
+  // message = "20, " + String(statusNode1) + " ," + String(statusNode2) + " ," + String(statusNode3);
+  // sendMessage(message, MasterNode, Node1, Node2, Node3);
+  // delay(1000);
   // parse for a packet, and call onReceive with the result:
   onReceive(LoRa.parsePacket());
+  // delay(3000);
 }
-void sendMessage(String outgoing, byte MasterNode, byte otherNode) {
+
+void sendMessage(String outgoing, byte MasterNode, byte slaveNode1, byte slaveNode2, byte slaveNode3) {
   LoRa.beginPacket();                   // start packet
-  LoRa.write(otherNode);              // add destination address
+  LoRa.write(slaveNode1);              // add destination address
+  LoRa.write(slaveNode2);              // add destination address
+  LoRa.write(slaveNode3);              // add destination address
   LoRa.write(MasterNode);             // add sender address
   LoRa.write(msgCount);                 // add message ID
   LoRa.write(outgoing.length());        // add payload length
@@ -199,7 +249,10 @@ void sendMessage(String outgoing, byte MasterNode, byte otherNode) {
   msgCount++;                           // increment message ID
 }
 void onReceive(int packetSize) {
-  if (packetSize == 0) return;          // if there's no packet, return
+  if (packetSize == 0) {
+    //Serial.println("Packet Size is 0");
+    return;
+  }          // if there's no packet, return
   // read packet header bytes:
   int recipient = LoRa.read();          // recipient address
   byte sender = LoRa.read();            // sender address
@@ -221,39 +274,36 @@ void onReceive(int packetSize) {
   }
   
   // if message is for this device, or broadcast, print details:
-  Serial.println("Received from: 0x" + String(sender, HEX));
-  Serial.println("Sent to: 0x" + String(recipient, HEX));
-  Serial.println("Message ID: " + String(incomingMsgId));
-  Serial.println("Message length: " + String(incomingLength));
-  Serial.println("Message: " + incoming);
-  Serial.println("RSSI: " + String(LoRa.packetRssi()));
-  Serial.println("Snr: " + String(LoRa.packetSnr()));
-  Serial.println();
+  //Serial.println("Received from: 0x" + String(sender, HEX));
+  //Serial.println("Sent to: 0x" + String(recipient, HEX));
+  //Serial.println("Message ID: " + String(incomingMsgId));
+  // Serial.println("Message length: " + String(incomingLength));
+  // Serial.println("Message: " + incoming);
+  //Serial.println("RSSI: " + String(LoRa.packetRssi()));
+  // Serial.println("Snr: " + String(LoRa.packetSnr()));
+  // Serial.println();
   if ( sender == 0XBB )
   {
     String status = getValue(incoming, ',', 0);
     incoming = "";
     
     //just for testing purposes
-    Serial.print("Node1 received status: ");
+    Serial.print("From Node1 received status: ");
     Serial.println(status);
 
-    current.statusNode1 = (status == "true" || status == "1");
+    if (status.toInt() == 0) {
+      statusNode1 = false;
+    } 
 
-    //notify the node you recieved data
-    if (status == "true" || status == "1") {
-      sendMessage("10", MasterNode, Node1);
-      Serial.println("Car present at Node 1");
-    } else if (status == "false" || status == "0") {
-      sendMessage("10", MasterNode, Node1);
-      Serial.println("Car not present at Node 1");
-    } else {
-      Serial.print("Wrong message from Node1: ");
-      Serial.println(status);
+    if (status.toInt() == 1) {
+      statusNode1 = true;
     }
 
+    Serial.print("statusNode1: ");
+    Serial.println(statusNode1);
+
     //store the status of the node/slot in permanent flash memory
-    preferences.putBool("statusNode1", current.statusNode1);
+    preferences.putBool("statusNode1", statusNode1);
   }
   if ( sender == 0XCC )
   {
@@ -261,51 +311,26 @@ void onReceive(int packetSize) {
     incoming = "";
     
     //just for testing purposes
-    Serial.print("Node2 received status: ");
+    Serial.print("From Node2 received status: ");
     Serial.println(status);
 
-    current.statusNode2 = (status == "true" || status == "1");
+    if (status.toInt() == 0) {
+      statusNode2 = false;
+    } 
 
-    //notify the node you recieved data
-    if (status == "true" || status == "1") {
-      sendMessage("20", MasterNode, Node2);
-      Serial.println("Car present at Node 2");
-    } else if (status == "false" || status == "0") {
-      sendMessage("20", MasterNode, Node2);
-      Serial.println("Car not present at Node 2");
-    } else {
-      Serial.print("Wrong message from Node2: ");
-      Serial.println(status);
+    if (status.toInt() == 1) {
+      statusNode2 = true;
     }
 
+    Serial.print("statusNode2: ");
+    Serial.println(statusNode2);
+
     //store the status of the node/slot in permanent flash memory
-    preferences.putBool("statusNode2", current.statusNode2);
+    preferences.putBool("statusNode2", statusNode2);
   }
     if ( sender == 0XDD )
   {
-    String status = getValue(incoming, ',', 0);
-    incoming = "";
-    
-    //just for testing purposes
-    Serial.print("Node3 received status: ");
-    Serial.println(status);
 
-    current.statusNode3 = (status == "true" || status == "1");
-
-    //notify the node you recieved data
-    if (status == "true" || status == "1") {
-      sendMessage("30", MasterNode, Node3);
-      Serial.println("Car present at Node 3");
-    } else if (status == "false" || status == "0") {
-      sendMessage("30", MasterNode, Node3);
-      Serial.println("Car not present at Node 3");
-    } else {
-      Serial.print("Wrong message from Node3: ");
-      Serial.println(status);
-    }
-
-    //store the status of the node/slot in permanent flash memory
-    preferences.putBool("statusNode3", current.statusNode3);
   }
 }
 
@@ -324,6 +349,75 @@ String getValue(String data, char separator, int index)
   return found > index ? data.substring(strIndex[0], strIndex[1]) : "";
 }
 
+bool isCarPresent(float magnitudes[], int length, float referenceValue) {
+    int count = 0;
+
+    for (int i = 0; i < length; i++) {
+        if (magnitudes[i] >= referenceValue + 7 || magnitudes[i] <= referenceValue - 7) {
+            count++;
+        } else {
+            count = 0;
+        }
+
+        if (count >= 3) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+float getRefMag(float magnitudes[], int length) {
+    float sum = 0.0;
+    int count = 0;
+    float mean = 0.0;
+    float processedMagnitudes[length];
+    int processedCount = 0;
+
+    // Calculate the mean of non-zero values
+    for (int i = 0; i < length; i++) {
+        if (magnitudes[i] != 0) {
+            sum += magnitudes[i];
+            count++;
+        }
+    }
+
+    if (count == 0) {
+        return 0.0;  // If no non-zero values, return 0
+    }
+
+    mean = sum / count;
+
+    // Remove values that deviate too much from the mean
+    for (int i = 0; i < length; i++) {
+        if (magnitudes[i] != 0 && abs(magnitudes[i] - mean) < 10) {
+            processedMagnitudes[processedCount] = magnitudes[i];
+            processedCount++;
+        }
+    }
+
+    if (processedCount == 0) {
+        return mean;  // Return mean if no values are within range
+    }
+
+    sum = 0;
+    for (int i = 0; i < processedCount; i++) {
+        sum += processedMagnitudes[i];
+    }
+
+    return sum / processedCount;  // Calculate the new average reference magnitude
+}
+
+String millisToMinutesAndSeconds(long millis) {
+  long minutes = millis / 60000;
+  long seconds = (millis % 60000) / 1000;
+  return String(minutes) + "m " + String(seconds) + "s";
+}
+
 void notFound(AsyncWebServerRequest *request) {
   request->send(404, "text/plain", "Not found");
+}
+
+bool stringToBool(const String& str) {
+  return str == "1";
 }
