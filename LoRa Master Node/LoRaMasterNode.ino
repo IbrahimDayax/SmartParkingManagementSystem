@@ -59,13 +59,26 @@ unsigned long refMagTime;
 Preferences preferences;
 
 const char *ssid = "GalaxyA13";
-const char *password = "ekkc0904";
+const char *password = "ekkc2024";
 // const char *ssid = "BlazingSpeed-TIME_AB4F";
 // const char *password = "ng96samM";
 
 AsyncWebServer server(80);
 
-unsigned long occupiedStartTimeNode2 = 0;  // Store the time when Node2 becomes occupied
+unsigned long occupiedTime1; //Store the time that Parking Slot 1 is occupied
+unsigned long occupiedTime2; //Store the time that Parking Slot 2 is occupied
+unsigned long occupiedTime3; //Store the time that Parking Slot 3 is occupied
+
+unsigned long occupiedStartTime1;
+unsigned long occupiedEndTime1;
+unsigned long occupiedStartTime2;
+unsigned long occupiedEndTime2;
+unsigned long occupiedStartTime3;
+unsigned long occupiedEndTime3;
+
+String elapsedTime1 = ""; //Store the time that Parking Slot 1 is occupied
+String elapsedTime2 = ""; //Store the time that Parking Slot 2 is occupied
+String elapsedTime3 = ""; //Store the time that Parking Slot 3 is occupied
 
 // HTML, CSS, and JS code stored in program memory
 const char index_html[] PROGMEM = R"rawliteral(
@@ -203,6 +216,28 @@ void setup() {
 void loop() {
   currentMillis = millis();
   currentSecs = currentMillis / 1000;
+
+  if (statusNode1 == true) {
+    occupiedTime1 = millis() - occupiedStartTime1;
+    Serial.print("Node 1 occupied Time: ");
+    elapsedTime1 = millisToHoursMinutesSeconds(occupiedTime1);
+    Serial.println(elapsedTime1);
+  }
+
+  if (statusNode2 == true) {
+    occupiedTime2 = millis() - occupiedStartTime2;
+    Serial.print("Node 2 occupied Time: ");
+    elapsedTime2 = millisToHoursMinutesSeconds(occupiedTime2);
+    Serial.println(elapsedTime2);
+  }
+
+  if (statusNode3 == true) {
+    occupiedTime3 = millis() - occupiedStartTime3;
+    Serial.print("Node 3 occupied Time: ");
+    elapsedTime3 = millisToHoursMinutesSeconds(occupiedTime3);
+    Serial.println(elapsedTime3);
+  }
+
   if ((unsigned long)(currentSecs - previousSecs) >= interval) {
     seconds = seconds + 1;
     if ( seconds > 5 )
@@ -288,19 +323,27 @@ void onReceive(int packetSize) {
     incoming = "";
     
     //just for testing purposes
-    Serial.print("From Node1 received status: ");
-    Serial.println(status);
-
-    if (status.toInt() == 0) {
-      statusNode1 = false;
-    } 
+    // Serial.print("From Node1 received status: ");
+    // Serial.println(status);
 
     if (status.toInt() == 1) {
       statusNode1 = true;
-    }
+      occupiedStartTime1 = millis();
+    } else if (status.toInt() == 0) {
+      statusNode1 = false;
+      occupiedEndTime1 = millis();
+    } 
+    
 
-    Serial.print("statusNode1: ");
-    Serial.println(statusNode1);
+    // Serial.print("statusNode1: ");
+    // Serial.println(statusNode1);
+
+    // if (statusNode1 == false) {
+    //   occupiedTime1 = occupiedEndTime1 - occupiedStartTime1;
+    //   Serial.print("Occupied Time: ");
+    //   elapsedTime1 = millisToHoursMinutesSeconds(occupiedTime1);
+    //   Serial.println(elapsedTime1);
+    // }
 
     //store the status of the node/slot in permanent flash memory
     preferences.putBool("statusNode1", statusNode1);
@@ -311,26 +354,62 @@ void onReceive(int packetSize) {
     incoming = "";
     
     //just for testing purposes
-    Serial.print("From Node2 received status: ");
-    Serial.println(status);
-
-    if (status.toInt() == 0) {
-      statusNode2 = false;
-    } 
+    // Serial.print("From Node2 received status: ");
+    // Serial.println(status);
 
     if (status.toInt() == 1) {
       statusNode2 = true;
-    }
+      occupiedStartTime2 = millis();
+    } else if (status.toInt() == 0) {
+      statusNode2 = false;
+      occupiedEndTime2 = millis();
+    } 
 
-    Serial.print("statusNode2: ");
-    Serial.println(statusNode2);
+    // Serial.print("statusNode2: ");
+    // Serial.println(statusNode2);
+
+    // if (statusNode2 == false) {
+    //   occupiedTime2 = occupiedEndTime2 - occupiedStartTime2;
+    //   Serial.print("Occupied Time: ");
+    //   elapsedTime2 = millisToHoursMinutesSeconds(occupiedTime2);
+    //   Serial.println(elapsedTime2);
+    // }
 
     //store the status of the node/slot in permanent flash memory
     preferences.putBool("statusNode2", statusNode2);
   }
     if ( sender == 0XDD )
   {
+    String status = getValue(incoming, ',', 0);
+    incoming = "";
 
+    unsigned long occupiedStartTime;
+    unsigned long occupiedEndTime;
+    
+    // //just for testing purposes
+    // Serial.print("From Node3 received status: ");
+    // Serial.println(status);
+
+    if (status.toInt() == 1) {
+      statusNode3 = true;
+      occupiedStartTime3 = millis();
+    } else if (status.toInt() == 0) {
+      statusNode3 = false;
+      occupiedEndTime3 = millis();
+    } 
+
+    // Serial.print("statusNode3: ");
+    // Serial.println(statusNode3);
+
+    // if (statusNode3 == false) {
+    //   occupiedTime3 = occupiedEndTime3 - occupiedStartTime3;
+    //   Serial.print("Occupied Time: ");
+    //   elapsedTime3 = millisToHoursMinutesSeconds(occupiedTime3);
+    //   Serial.println(elapsedTime3);
+    // }
+
+    //store the status of the node/slot in permanent flash memory
+    preferences.putBool("statusNode3", statusNode3);
   }
 }
 
@@ -408,10 +487,25 @@ float getRefMag(float magnitudes[], int length) {
     return sum / processedCount;  // Calculate the new average reference magnitude
 }
 
-String millisToMinutesAndSeconds(long millis) {
-  long minutes = millis / 60000;
-  long seconds = (millis % 60000) / 1000;
-  return String(minutes) + "m " + String(seconds) + "s";
+String millisToHoursMinutesSeconds(long millis) {
+  String s, m, h;
+  long seconds = millis / 1000;
+  long minutes = seconds / 60;
+  long hours = minutes / 60;
+  seconds = seconds % 60;
+  minutes = minutes % 60;
+
+  if (hours < 1) {
+    h = "00";
+  }
+  if (minutes < 1) {
+    m = "00";
+  }
+  if (seconds < 10) {
+    s = "0" + String(seconds);
+  }
+  
+  return h + ":" + m + ":" + s;
 }
 
 void notFound(AsyncWebServerRequest *request) {
