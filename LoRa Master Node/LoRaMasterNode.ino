@@ -58,14 +58,14 @@ unsigned long refMagTime;
 
 Preferences preferences;
 
-const char *ssid = "GalaxyA13";
-const char *password = "ekkc2024";
-// const char *ssid = "BlazingSpeed-TIME_AB4F";
-// const char *password = "ng96samM";
+// const char *ssid = "GalaxyA13";
+// const char *password = "ekkc2024";
+const char *ssid = "BlazingSpeed-TIME_AB4F";
+const char *password = "ng96samM";
 
 AsyncWebServer server(80);
 
-unsigned long occupiedTime1; //Store the time that Parking Slot 1 is occupied
+unsigned long occupiedTime1 = 0; //Store the time that Parking Slot 1 is occupied
 unsigned long occupiedTime2; //Store the time that Parking Slot 2 is occupied
 unsigned long occupiedTime3; //Store the time that Parking Slot 3 is occupied
 
@@ -128,29 +128,40 @@ const char index_html[] PROGMEM = R"rawliteral(
   <div id="Node3" class="node %STATUS_NODE_3%"></div>
   <!-- Add more nodes as needed -->
   <script>
-    function updateNodeStatus(nodeId, isOccupied) {
+    function updateNodeStatus(nodeId, isOccupied, elapsedTime) {
       var nodeElement = document.getElementById(nodeId);
       if (isOccupied) {
         nodeElement.classList.remove('unoccupied');
         nodeElement.classList.add('occupied');
+        if (nodeId == "Node1") {
+          startTime1 = Date.now();
+          nodeElement.innerText = elapsedTime;
+        }
+        if (nodeId == "Node2") {
+          nodeElement.innerText = elapsedTime;
+        }
+        if (nodeId == "Node3") {
+          nodeElement.innerText = elapsedTime;
+        }
       } else {
         nodeElement.classList.remove('occupied');
         nodeElement.classList.add('unoccupied');
+        nodeElement.innerText = "";
       }
     }
 
-    function updateParkingStatus(statusNode1, statusNode2, statusNode3) {
-      updateNodeStatus('Node1', statusNode1);
-      updateNodeStatus('Node2', statusNode2);
-      updateNodeStatus('Node3', statusNode3);
+    function updateParkingStatus(statusNode1, statusNode2, statusNode3, elapsedTime1, elapsedTime2, elapsedTime3) {
+      updateNodeStatus('Node1', statusNode1, elapsedTime1);
+      updateNodeStatus('Node2', statusNode2, elapsedTime2);
+      updateNodeStatus('Node3', statusNode3, elapsedTime3);
       // Add more nodes as needed
     }
 
     function fetchAndUpdate() {
       fetch('/status')  // Assuming you have a new route for fetching status
         .then(response => response.json())
-        .then(data => updateParkingStatus(data.statusNode1, data.statusNode2, data.statusNode3))
-        .catch(error => console.error('Error fetching status:', error));
+        .then(data => updateParkingStatus(data.statusNode1, data.statusNode2, data.statusNode3, data.elapsedTime1, data.elapsedTime2, data.elapsedTime3))
+        .catch(error => console.error('Error fetching status and occupiedTime:', error));
     }
 
     window.onload = function () {
@@ -202,8 +213,12 @@ void setup() {
   // Route for status 
   server.on("/status", HTTP_GET, [](AsyncWebServerRequest *request) {
     String json = "{\"statusNode1\":" + String(statusNode1) +
-                  ",\"statusNode2\":" + String(statusNode2) +
-                  ",\"statusNode3\":" + String(statusNode3) + "}";
+              ",\"statusNode2\":" + String(statusNode2) +
+              ",\"statusNode3\":" + String(statusNode3) +
+              ",\"elapsedTime1\":\"" + elapsedTime1 + "\"" + 
+              ",\"elapsedTime2\":\"" + elapsedTime2 + "\"" +
+              ",\"elapsedTime3\":\"" + elapsedTime3 + "\"" + "}";
+
     request->send(200, "application/json", json);
   });
 
@@ -332,6 +347,7 @@ void onReceive(int packetSize) {
     } else if (status.toInt() == 0) {
       statusNode1 = false;
       occupiedEndTime1 = millis();
+      occupiedTime1 = 0;
     } 
     
 
@@ -363,6 +379,7 @@ void onReceive(int packetSize) {
     } else if (status.toInt() == 0) {
       statusNode2 = false;
       occupiedEndTime2 = millis();
+      occupiedTime2 = 0;
     } 
 
     // Serial.print("statusNode2: ");
@@ -396,6 +413,7 @@ void onReceive(int packetSize) {
     } else if (status.toInt() == 0) {
       statusNode3 = false;
       occupiedEndTime3 = millis();
+      occupiedTime3 = 0;
     } 
 
     // Serial.print("statusNode3: ");
@@ -495,18 +513,14 @@ String millisToHoursMinutesSeconds(long millis) {
   seconds = seconds % 60;
   minutes = minutes % 60;
 
-  if (hours < 1) {
-    h = "00";
-  }
-  if (minutes < 1) {
-    m = "00";
-  }
-  if (seconds < 10) {
-    s = "0" + String(seconds);
-  }
-  
+  // Format hours, minutes, and seconds with leading zeros if less than 10
+  h = (hours < 10) ? "0" + String(hours) : String(hours);
+  m = (minutes < 10) ? "0" + String(minutes) : String(minutes);
+  s = (seconds < 10) ? "0" + String(seconds) : String(seconds);
+
   return h + ":" + m + ":" + s;
 }
+
 
 void notFound(AsyncWebServerRequest *request) {
   request->send(404, "text/plain", "Not found");
