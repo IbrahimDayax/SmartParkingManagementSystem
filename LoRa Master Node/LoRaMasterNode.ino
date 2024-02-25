@@ -81,95 +81,199 @@ String elapsedTime2 = ""; //Store the time that Parking Slot 2 is occupied
 String elapsedTime3 = ""; //Store the time that Parking Slot 3 is occupied
 
 // HTML, CSS, and JS code stored in program memory
-const char index_html[] PROGMEM = R"rawliteral(
-<!DOCTYPE html>
+const char index_html[] PROGMEM =R"rawliteral(
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 0;
-      padding: 20px;
-      text-align: center;
-      background-color: #f4f4f4;
-    }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            margin: 0;
+            padding: 20px;
+            text-align: center;
+            background-color: #42a1f5;
+        }
 
-    h1 {
-      color: #333;
-    }
+        h1 {
+            color: #333;
+        }
 
-    .node {
-      display: inline-block;
-      margin: 10px;
-      width: 80px;
-      height: 80px;
-      border-radius: 50%;
-      line-height: 80px;
-      font-size: 16px;
-      color: #fff;
-    }
+        .parking-grid {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+        }
 
-    .unoccupied {
-      background-color: green;
-    }
+        .parking-space {
+            width: calc((100% - 60px) / 5); /* Adjusted width to fit 5 per row */
+            height: 300px; /* Adjusted height */
+            background-color: green;
+            border: 2px dashed #fff; /* Border on all sides */
+            border-bottom: none; /* No border at the bottom */
+            position: relative;
+        }
 
-    .occupied {
-      background-color: red;
-    }
-  </style>
-  <title>Parking Status</title>
+        .occupied {
+            background-color: red;
+        }
+
+        .available {
+            background-color: green;
+        }
+
+        .parking-text {
+            font-size: 12px;
+            color: #fff;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .legend {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 14px;
+        }
+
+        .legend-item {
+            margin-bottom: 5px;
+        }
+
+        .legend-square {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            margin-right: 5px;
+            border-radius: 3px;
+        }
+
+        .datetime {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-size: 18px;
+            color: #fff;
+        }
+
+        .weather {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 16px;
+            color: #fff;
+        }
+    </style>
+    <title>Parking Grid</title>
 </head>
+
 <body>
-  <h1>Parking Status</h1>
-  <div id="Node1" class="node %STATUS_NODE_1%"></div>
-  <div id="Node2" class="node %STATUS_NODE_2%"></div>
-  <div id="Node3" class="node %STATUS_NODE_3%"></div>
-  <!-- Add more nodes as needed -->
-  <script>
-    function updateNodeStatus(nodeId, isOccupied, elapsedTime) {
-      var nodeElement = document.getElementById(nodeId);
-      if (isOccupied) {
-        nodeElement.classList.remove('unoccupied');
-        nodeElement.classList.add('occupied');
-        if (nodeId == "Node1") {
-          startTime1 = Date.now();
-          nodeElement.innerText = elapsedTime;
-        }
-        if (nodeId == "Node2") {
-          nodeElement.innerText = elapsedTime;
-        }
-        if (nodeId == "Node3") {
-          nodeElement.innerText = elapsedTime;
-        }
-      } else {
-        nodeElement.classList.remove('occupied');
-        nodeElement.classList.add('unoccupied');
-        nodeElement.innerText = "";
-      }
-    }
+    <div class="datetime" id="datetime"></div>
+    <h1>Parking Grid</h1>
+    <div class="legend">
+      <div class="legend-item">
+          <div class="legend-square occupied"></div>
+          Occupied
+      </div>
+      <div class="legend-item">
+          <div class="legend-square available"></div>
+          Available
+      </div>
+  </div>
+    <div class="parking-grid">
+        <!-- Parking spaces -->
+        <!-- Row 1 -->
+        <div class="parking-space" id="Node1">
+            <div class="parking-text">1</div>
+        </div>
+        <div class="parking-space" id="Node2">
+            <div class="parking-text">2</div>
+        </div>
+        <div class="parking-space" id="Node3">
+            <div class="parking-text">3</div>
+        </div>
+        <div class="parking-space" id="Node4">
+            <div class="parking-text">4</div>
+        </div>
+        <div class="parking-space" id="Node5">
+            <div class="parking-text">5</div>
+        </div>
+        <!-- Add more parking spaces as needed -->
+        <!-- Row 2 -->
+        <div class="parking-space" id="Node6">
+            <div class="parking-text">6</div>
+        </div>
+        <div class="parking-space" id="Node7">
+            <div class="parking-text">7</div>
+        </div>
+        <div class="parking-space" id="Node8">
+            <div class="parking-text">8</div>
+        </div>
+        <div class="parking-space" id="Node9">
+            <div class="parking-text">9</div>
+        </div>
+        <div class="parking-space" id="Node10">
+            <div class="parking-text">10</div>
+        </div>
+        <!-- Add more parking spaces as needed -->
+    </div>
 
-    function updateParkingStatus(statusNode1, statusNode2, statusNode3, elapsedTime1, elapsedTime2, elapsedTime3) {
-      updateNodeStatus('Node1', statusNode1, elapsedTime1);
-      updateNodeStatus('Node2', statusNode2, elapsedTime2);
-      updateNodeStatus('Node3', statusNode3, elapsedTime3);
-      // Add more nodes as needed
-    }
+    <script>
+        function updateNodeStatus(nodeId, isOccupied, elapsedTime) {
+            var nodeElement = document.getElementById(nodeId);
+            if (isOccupied) {
+                nodeElement.classList.add('occupied');
+                nodeElement.querySelector('.parking-text').textContent = elapsedTime;
+            } else {
+                nodeElement.classList.remove('occupied');
+                nodeElement.querySelector('.parking-text').textContent = extractNumFromStr(nodeId);
+            }
+        }
 
-    function fetchAndUpdate() {
-      fetch('/status')  // Assuming you have a new route for fetching status
-        .then(response => response.json())
-        .then(data => updateParkingStatus(data.statusNode1, data.statusNode2, data.statusNode3, data.elapsedTime1, data.elapsedTime2, data.elapsedTime3))
-        .catch(error => console.error('Error fetching status and occupiedTime:', error));
-    }
+        function updateParkingStatus(statusNode1, statusNode2, statusNode3, elapsedTime1, elapsedTime2, elapsedTime3) {
+            updateNodeStatus('Node1', statusNode1, elapsedTime1);
+            updateNodeStatus('Node2', statusNode2, elapsedTime2);
+            updateNodeStatus('Node3', statusNode3, elapsedTime3);
+            // Add more nodes as needed
+        }
 
-    window.onload = function () {
-      fetchAndUpdate();
-      setInterval(fetchAndUpdate, 1000);  // Update every 1 seconds (adjust as needed)
-    };
-  </script>
+        function extractNumFromStr(str) {
+            // Use regular expression to match the digits at the end of the string
+            const match = str.match(/\d+$/);
+            
+            // If there's a match, return the matched digits, otherwise return null
+            return match ? match[0] : null;
+        }
+
+        function fetchAndUpdate() {
+            fetch('/status') // Assuming you have a new route for fetching status
+                .then(response => response.json())
+                .then(data => updateParkingStatus(data.statusNode1, data.statusNode2, data.statusNode3, data.elapsedTime1, data.elapsedTime2, data.elapsedTime3))
+                .catch(error => console.error('Error fetching status and occupiedTime:', error));
+        }
+
+        window.onload = function() {
+            fetchAndUpdate();
+            setInterval(fetchAndUpdate, 1000); // Update every 1 second (adjust as needed)
+            // Update datetime
+            updateDateTime();
+            setInterval(updateDateTime, 1000); // Update every second
+        };
+
+        // Function to update date and time
+        function updateDateTime() {
+            const now = new Date();
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric' };
+            const formattedDateTime = now.toLocaleDateString('en-US', options);
+            document.getElementById('datetime').textContent = formattedDateTime;
+        }
+    </script>
 </body>
+
 </html>
 )rawliteral";
 
@@ -234,23 +338,23 @@ void loop() {
 
   if (statusNode1 == true) {
     occupiedTime1 = millis() - occupiedStartTime1;
-    Serial.print("Node 1 occupied Time: ");
+    //Serial.print("Node 1 occupied Time: ");
     elapsedTime1 = millisToHoursMinutesSeconds(occupiedTime1);
-    Serial.println(elapsedTime1);
+    //Serial.println(elapsedTime1);
   }
 
   if (statusNode2 == true) {
     occupiedTime2 = millis() - occupiedStartTime2;
-    Serial.print("Node 2 occupied Time: ");
+    //Serial.print("Node 2 occupied Time: ");
     elapsedTime2 = millisToHoursMinutesSeconds(occupiedTime2);
-    Serial.println(elapsedTime2);
+    //Serial.println(elapsedTime2);
   }
 
   if (statusNode3 == true) {
     occupiedTime3 = millis() - occupiedStartTime3;
-    Serial.print("Node 3 occupied Time: ");
+    //Serial.print("Node 3 occupied Time: ");
     elapsedTime3 = millisToHoursMinutesSeconds(occupiedTime3);
-    Serial.println(elapsedTime3);
+    //Serial.println(elapsedTime3);
   }
 
   if ((unsigned long)(currentSecs - previousSecs) >= interval) {
