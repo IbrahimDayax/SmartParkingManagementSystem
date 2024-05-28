@@ -1,7 +1,7 @@
 # Smart Parking System
 
 ## Overview
-The Smart Parking System is a project aimed at creating an efficient parking management solution using LoRa technology and Arduino-based microcontrollers. The system enables real-time monitoring of parking space occupancy, providing users with up-to-date information on available parking spots. This repository contains the code and documentation for both the master node and slave nodes of the smart parking system.
+The Smart Parking System is a project aimed at creating an efficient parking management solution for commercial areas using LoRa technology and Arduino-based microcontrollers. The system enables real-time monitoring of parking space occupancy, providing users with up-to-date information on available parking spots. This repository contains the code and documentation for both the master node and slave nodes of the smart parking system.
 
 ## Components
 ### Master Node
@@ -15,7 +15,7 @@ The Smart Parking System is a project aimed at creating an efficient parking man
 
 ## Functionality
 - **Real-time Monitoring**: Users can remotely monitor parking space availability through a web interface.
-- **Automated Updates**: The system automatically updates parking space status based on vehicle presence.
+- **Automated Updates**: The system automatically updates parking space status based on vehicle presence every second.
 - **Energy Efficiency**: Integration of solar panels ensures sustainable power supply for extended operation.
 - **Customizable**: The system can be easily expanded to accommodate additional parking spaces.
 
